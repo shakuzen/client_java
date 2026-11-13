@@ -1,0 +1,52 @@
+{
+  "base_sha": "743bbab03410082675b1203566ed65a84a5512d6",
+  "platform": "macOS-26.7.3-arm64-arm-64bit",
+  "machine": "arm64",
+  "jdk": [
+    "openjdk version \"25.0.5\" 2026-10-20 LTS",
+    "OpenJDK Runtime Environment (build 25.0.5+11-LTS)",
+    "OpenJDK 64-Bit Server VM (build 25.0.5+11-LTS, mixed mode, sharing)"
+  ],
+  "jmh_args": [
+    "RegistryBenchmark",
+    "-f",
+    "3",
+    "-wi",
+    "3",
+    "-i",
+    "5",
+    "-w",
+    "1s",
+    "-r",
+    "1s",
+    "-prof",
+    "gc",
+    "-jvmArgs",
+    "-Xms512m -Xmx512m"
+  ],
+  "notes": [
+    "Single-thread local JMH comparison; not a dedicated benchmark machine.",
+    "The same benchmark source and prebuilt snapshots are used in both jars.",
+    "Only the registry membership collection implementations differ."
+  ],
+  "baseline_jar_sha256": "4deea35b157920e0419d92f2d10473457fd9343f6b3496b6fac4ac83205be824",
+  "copy-on-write_jar_sha256": "c643f755b89a3b4ae8c9a92fb2903371ab07abf34957bf4520b076a13de65ea9",
+  "cpu": "Apple M5 Pro",
+  "logical_cpus": 15,
+  "memory_bytes": 25769803776,
+  "comparison_notes": [
+    "Baseline: ConcurrentHashMap.newKeySet() for both registry membership sets.",
+    "Candidate: CopyOnWriteArraySet for those same sets; other production code is identical.",
+    "Variants ran sequentially: baseline first, then copy-on-write.",
+    "JMH runs use one thread, three JVM forks, three 1s warmups, and five 1s measurements.",
+    "The benchmark class bytecode hashes match between the two jars.",
+    "Optional registration metadata and per-collect snapshot allocation are excluded.",
+    "Registry snapshot construction and sorting remain part of the scrape measurement.",
+    "Families use names resident_0, resident_1, ... in insertion order; scrape includes sorting."
+  ],
+  "baseline_benchmark_sha256": "5f7dd27b4fd5b1748b45ed0071f1e14ff99eddf222650f35573f6abf30b531f2",
+  "candidate_benchmark_sha256": "5f7dd27b4fd5b1748b45ed0071f1e14ff99eddf222650f35573f6abf30b531f2",
+  "baseline_source_sha256": "a9edb4cad1c41c8dd375ff534f68947c5dfaa872821f1d1e76a8493d58534e6e",
+  "candidate_source_sha256": "9d7823929a3bd7d2f648b4f2e3eb280a60ab8f9918a7076136c31f47861753a3",
+  "source": "benchmarks/src/main/java/io/prometheus/metrics/benchmarks/RegistryBenchmark.java"
+}

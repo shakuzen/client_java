@@ -55,6 +55,37 @@ JMH parameter reference:
 
 ## Results
 
+### Registry membership and collection
+
+`RegistryBenchmark` measures initial registration (`registerAll`), one add/remove
+pair in a populated registry (`registerUnregister`), and collection (`scrape`).
+Parameters select 100, 1,000, or 10,000 resident collectors and the `Collector` or
+`MultiCollector` interface. Each collector returns one prebuilt gauge family.
+Optional registration metadata is omitted, matching legacy adapter collectors;
+the benchmark isolates registry membership costs rather than metric construction
+or registration-time schema validation. `registerAll` reports cost per complete
+registry, not per collector. `registerUnregister` reports cost per pair.
+Families are named `resident_0`, `resident_1`, and so on in registration order.
+The scrape measurement includes snapshot construction and sorting, so its result
+reflects collection order as well as membership traversal.
+
+```shell
+./mvnw -pl benchmarks -am package -DskipTests -Dcoverage.skip=true
+java -jar benchmarks/target/benchmarks.jar RegistryBenchmark \
+  -f 3 -wi 3 -i 5 -w 1s -r 1s -prof gc \
+  -jvmArgs '-Xms512m -Xmx512m' \
+  -rf json -rff registry-results.json
+```
+
+Use identical benchmark source and JVM settings for both implementations. Lower
+average time is better; GC profiler `gc.alloc.rate.norm` is allocated bytes per
+operation. Run the variants sequentially to avoid CPU contention between them.
+The existing PR benchmark workflow does not automatically select this benchmark.
+
+The local snapshot-iteration comparison is stored in
+`benchmarks/results/registry-snapshot-iteration/`. Its `report.txt` includes
+commands, environment information, raw JMH results, and allocation data.
+
 ### Pull request benchmarks
 
 The `benchmark` label runs the PR head and base on the same runner for each topic.

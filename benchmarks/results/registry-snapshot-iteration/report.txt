@@ -1,0 +1,98 @@
+Registry snapshot iteration: local JMH comparison
+================================================
+
+Upstream base: 743bbab03410082675b1203566ed65a84a5512d6
+Baseline: ConcurrentHashMap.newKeySet() membership sets.
+Candidate: CopyOnWriteArraySet membership sets; other production source is identical.
+Date: 2026-11-13
+Host: Apple M5 Pro, 15 logical CPUs, 24 GiB RAM, macOS 26.7.3 arm64.
+JDK: OpenJDK 25.0.5 (Liberica); JMH 1.37.
+
+Reproduction
+------------
+Build identical RegistryBenchmark source against each membership implementation:
+  ./mvnw -pl benchmarks -am package -DskipTests -Dcoverage.skip=true
+Run each resulting jar sequentially:
+  java -jar <variant.jar> RegistryBenchmark -f 3 -wi 3 -i 5 -w 1s -r 1s \
+    -prof gc -jvmArgs '-Xms512m -Xmx512m' -rf json -rff <variant.json>
+
+Each case has 3 JVM forks, 3 one-second warmups, and 5 one-second measurements.
+Baseline completed before candidate started; the two variants did not compete for CPU.
+Both jars contain identical benchmark-class bytecode (hashes in environment.json).
+Full JSON includes JMH score errors, confidence intervals, and per-fork raw data.
+
+Benchmark scope
+---------------
+One thread, one prebuilt gauge family per collector, no optional registration metadata.
+This models legacy adapter membership, including the Micrometer MultiCollector path.
+Metric construction, sample collection allocation, registration schema validation,
+concurrent writers, and application callbacks are not measured.
+registerAll is cost per complete registry, using prebuilt collector instances.
+registerUnregister is cost per add/remove pair at the stated resident collector count.
+scrape includes snapshot construction and sorting. Names are resident_0, resident_1, etc.
+The copy-on-write iteration order can favor sorting; read results are workload-dependent.
+This is a local comparison, not an isolated CI runner. Small differences need confirmation.
+
+Average time (microseconds per operation; lower is better)
+--------------------------------------------------------
+Operation             Type             Count     Base us      COW us    COW/base
+registerAll           collector          100       2.052       1.663       0.81
+registerAll           collector         1000      18.880     113.886       6.03
+registerAll           collector        10000     205.141   12668.347      61.75
+registerAll           multiCollector     100       4.133       3.721       0.90
+registerAll           multiCollector    1000      39.264     130.850       3.33
+registerAll           multiCollector   10000     467.458   13164.432      28.16
+registerUnregister    collector          100       0.014       0.049       3.39
+registerUnregister    collector         1000       0.013       0.444      33.98
+registerUnregister    collector        10000       0.013       4.066     308.96
+registerUnregister    multiCollector     100       0.026       0.058       2.25
+registerUnregister    multiCollector    1000       0.025       0.453      18.24
+registerUnregister    multiCollector   10000       0.034       4.083     120.13
+scrape                collector          100       3.608       1.914       0.53
+scrape                collector         1000      47.052      20.566       0.44
+scrape                collector        10000    1351.701     240.750       0.18
+scrape                multiCollector     100       3.795       2.365       0.62
+scrape                multiCollector    1000      50.140      25.393       0.51
+scrape                multiCollector   10000    1443.016     284.330       0.20
+
+Allocation (bytes per operation)
+--------------------------------
+Operation             Type             Count        Base B         COW B
+registerAll           collector          100        6952.0       22408.0
+registerAll           collector         1000       57858.8     2020408.8
+registerAll           collector        10000      517449.4   200200496.3
+registerAll           multiCollector     100       15874.7       31288.0
+registerAll           multiCollector    1000      139160.3     2101763.6
+registerAll           multiCollector   10000     1272187.3   200956686.6
+registerUnregister    collector          100          32.0         840.0
+registerUnregister    collector         1000          32.0        8040.0
+registerUnregister    collector        10000          32.0       80040.0
+registerUnregister    multiCollector     100          88.0         896.0
+registerUnregister    multiCollector    1000         112.0        8120.0
+registerUnregister    multiCollector   10000         112.0       80120.0
+scrape                collector          100        8968.0        8968.0
+scrape                collector         1000       85872.3       83856.1
+scrape                collector        10000      881482.4      834753.7
+scrape                multiCollector     100        8968.0        8968.0
+scrape                multiCollector    1000       85872.4       83856.2
+scrape                multiCollector   10000      881483.1      834754.0
+
+Interpretation
+--------------
+Copy-on-write avoids mixing old and replacement collector identities within an iteration.
+The price is linear membership scanning and array copying on mutations.
+Large-registry startup and churn incur substantial time and allocation regressions.
+Scraping is faster in this workload, including its insertion-order/sorting effects.
+Assess the tradeoff against realistic registry size and collector replacement frequency.
+
+History
+-------
+No registration-performance rationale or registry benchmark was found in PR #1800.
+The PR first retained CopyOnWriteArrayList, then changed to concurrent sets in:
+https://github.com/prometheus/client_java/commit/9289e4acb90d06deda3825344a4effafdb45cd31
+That commit is titled "cleanups, ironing out edge cases".
+The alternative PR #1728 reported an approximately 10% exposition slowdown for the
+duplicate-name feature. Those benchmarks did not measure registry registration:
+https://github.com/prometheus/client_java/pull/1728
+PR #1800 review discussed atomic duplicate-instance detection, not registration throughput:
+https://github.com/prometheus/client_java/pull/1800#discussion_r2755222269
