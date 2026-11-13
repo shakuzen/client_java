@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Predicate;
 import javax.annotation.Nullable;
 
@@ -23,8 +24,8 @@ public class PrometheusRegistry {
 
   public static final PrometheusRegistry defaultRegistry = new PrometheusRegistry();
 
-  private final Set<Collector> collectors = ConcurrentHashMap.newKeySet();
-  private final Set<MultiCollector> multiCollectors = ConcurrentHashMap.newKeySet();
+  private final Set<Collector> collectors = new CopyOnWriteArraySet<>();
+  private final Set<MultiCollector> multiCollectors = new CopyOnWriteArraySet<>();
   private final ConcurrentHashMap<String, RegistrationInfo> registered = new ConcurrentHashMap<>();
   private final ConcurrentHashMap<Collector, CollectorRegistration> collectorMetadata =
       new ConcurrentHashMap<>();
